@@ -3,6 +3,9 @@
 #include <iostream>
 #include <string>
 
+#include "colors.h"
+#include "frame_buffer.h"
+
 constexpr int DEFAULT_WIDTH{800};
 constexpr int DEFAULT_HEIGHT{600};
 
@@ -18,7 +21,7 @@ int main(int argc, char* argv[]) {
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     std::cerr << "SDL_Init failed: " << SDL_GetError() << '\n';
-    return 1;
+    return -1;
   }
   std::cout << "SDL2 works\n";
 
@@ -30,8 +33,24 @@ int main(int argc, char* argv[]) {
   if (rc == -1) {
     std::cerr << "SDL_CreateWindowAndRenderer failed: " << SDL_GetError()
               << '\n';
-    return 1;
+    SDL_Quit();
+    return -1;
   }
+
+  SDL_Texture* texture{SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                         SDL_TEXTUREACCESS_STREAMING,
+                                         config.width, config.height)};
+  if (texture == nullptr) {
+    std::cerr << "SDL_CreateTexture failed: " << SDL_GetError() << '\n';
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return -1;
+  }
+
+  FrameBuffer fb{static_cast<size_t>(config.width),
+                 static_cast<size_t>(config.height)};
+  fb.fill(colors::RED);
 
   SDL_Event event;
   bool running{true};
@@ -44,14 +63,9 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    // test render
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-    SDL_Rect rectangle{100, 100, 200, 150};
-    SDL_RenderFillRect(renderer, &rectangle);
-
+    SDL_UpdateTexture(texture, nullptr, fb.data(),
+                      fb.get_width() * sizeof(uint32_t));
+    SDL_RenderCopy(renderer, texture, nullptr, nullptr);
     SDL_RenderPresent(renderer);
   }
 
