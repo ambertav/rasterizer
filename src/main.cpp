@@ -5,6 +5,7 @@
 
 #include "colors.h"
 #include "frame_buffer.h"
+#include "rasterizer.h"
 
 constexpr int DEFAULT_WIDTH{800};
 constexpr int DEFAULT_HEIGHT{600};
@@ -48,9 +49,8 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  FrameBuffer fb{static_cast<size_t>(config.width),
-                 static_cast<size_t>(config.height)};
-  fb.fill(colors::RED);
+  Rasterizer rasterizer{static_cast<size_t>(config.width),
+                        static_cast<size_t>(config.height)};
 
   SDL_Event event;
   bool running{true};
@@ -63,8 +63,11 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    SDL_UpdateTexture(texture, nullptr, fb.data(),
-                      fb.get_width() * sizeof(uint32_t));
+    rasterizer.clear();
+    rasterizer.draw_line({100, 100}, {400, 300}, colors::WHITE);
+
+    SDL_UpdateTexture(texture, nullptr, rasterizer.get_frame_buffer()->data(),
+                      config.width * sizeof(uint32_t));
     SDL_RenderCopy(renderer, texture, nullptr, nullptr);
     SDL_RenderPresent(renderer);
   }
