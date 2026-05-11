@@ -73,6 +73,13 @@ struct Mat4 {
   const float& operator()(size_t row, size_t col) const {
     return data[row * 4 + col];
   }
+
+  void set_row(size_t row, const Vec4& vector) noexcept {
+    operator()(row, 0) = vector.x;
+    operator()(row, 1) = vector.y;
+    operator()(row, 2) = vector.z;
+    operator()(row, 3) = vector.w;
+  }
 };
 
 inline Vec3 operator+(Vec3 lhs, const Vec3& rhs) noexcept { return lhs += rhs; }
@@ -105,7 +112,7 @@ inline Vec3 normalize(const Vec3& vector) noexcept {
 
 inline Vec3 cross(const Vec3& lhs, const Vec3& rhs) noexcept {
   float x{(lhs.y * rhs.z) - (lhs.z * rhs.y)};
-  float y{ -1 * ((lhs.x * rhs.z) - (lhs.z * rhs.x))};
+  float y{-((lhs.x * rhs.z) - (lhs.z * rhs.x))};
   float z{(lhs.x * rhs.y) - (lhs.y * rhs.x)};
 
   return {x, y, z};
