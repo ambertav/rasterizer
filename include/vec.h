@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cmath>
-#include <compare>
 
 namespace vec {
 struct Vec2 {
@@ -17,7 +16,7 @@ struct Vec2 {
   int& operator[](size_t i) noexcept { return data[i]; }
   const int& operator[](size_t i) const noexcept { return data[i]; }
 
-  auto operator<=>(const Vec2&) const = default;
+  bool operator==(const Vec2&) const = default;
 };
 
 struct Vec2f {
@@ -32,7 +31,7 @@ struct Vec2f {
   float& operator[](size_t i) noexcept { return data[i]; }
   const float& operator[](size_t i) const noexcept { return data[i]; }
 
-  auto operator<=>(const Vec2f&) const = default;
+  bool operator==(const Vec2f&) const = default;
 };
 
 struct Vec3 {
@@ -49,7 +48,7 @@ struct Vec3 {
   float& operator[](size_t i) noexcept { return data[i]; }
   const float& operator[](size_t i) const noexcept { return data[i]; }
 
-  auto operator<=>(const Vec3&) const = default;
+  bool operator==(const Vec3&) const = default;
 
   Vec3& operator+=(const Vec3& other) noexcept {
     for (size_t i{}; i < 3; ++i) {
@@ -96,7 +95,7 @@ struct Vec4 {
   float& operator[](size_t i) noexcept { return data[i]; }
   const float& operator[](size_t i) const noexcept { return data[i]; }
 
-  auto operator<=>(const Vec4&) const = default;
+  bool operator==(const Vec4&) const = default;
 
   Vec4& operator+=(const Vec4& other) noexcept {
     for (size_t i{}; i < 4; ++i) {
