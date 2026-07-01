@@ -1,8 +1,9 @@
 #include "camera.h"
 
-Camera::Camera(vec::Vec3 t = {0.0f, 0.0f, 0.0f}, float r = 5.0f,
-               float th = 0.0f, float p = M_PI / 2.0f, float fv = 45.0f,
-               float n = 0.1f, float fr = 1000.0f)
+#include <cmath>
+
+Camera::Camera(vec::Vec3 t, float r, float th, float p, float fv, float n,
+               float fr)
     : target(t), rho(r), theta(th), phi(p), fov(fv), near(n), far(fr) {}
 
 vec::Mat4 Camera::get_view_matrix() const noexcept {
@@ -22,17 +23,23 @@ vec::Mat4 Camera::get_view_matrix() const noexcept {
     [ 0         0         0          1                       ]
   */
 
-  vec::Vec3 world_up{0.0f, 0.0f, 1.0f};
   vec::Vec3 position{get_position()};
+  vec::Vec3 world_up{0.0f, 0.0f, 1.0f};
 
   vec::Vec3 forward{vec::normalize(position - target)};
+
+  // fallback when camera at pole (forward nearly paralell to Z-up)
+  if (std::abs(forward.z()) > 0.999f) {
+    world_up = {1.0f, 0.0f, 0.0f};
+  }
+
   vec::Vec3 right{vec::normalize(vec::cross(world_up, forward))};
   vec::Vec3 up{vec::normalize(vec::cross(forward, right))};
 
   vec::Vec4 axes[4]{
-      {right.x, right.y, right.z, -vec::dot(right, position)},
-      {up.x, up.y, up.z, -vec::dot(up, position)},
-      {forward.x, forward.y, forward.z, -vec::dot(forward, position)},
+      {right.x(), right.y(), right.z(), -vec::dot(right, position)},
+      {up.x(), up.y(), up.z(), -vec::dot(up, position)},
+      {forward.x(), forward.y(), forward.z(), -vec::dot(forward, position)},
       {0.0f, 0.0f, 0.0f, 1.0f}};
 
   vec::Mat4 view_matrix{};
@@ -43,11 +50,23 @@ vec::Mat4 Camera::get_view_matrix() const noexcept {
   return view_matrix;
 }
 
-vec::Mat4 Camera::get_projection_matrix() const noexcept {}
+vec::Mat4 Camera::get_projection_matrix(float aspect_ratio) const noexcept {
+  float fov_rad{fov * (std::numbers::pi_v<float> / 180.0f)};
+  float t{std::tan(fov_rad / 2.0f)};
+
+  vec::Mat4 projection_matrix{};
+  projection_matrix(0, 0) = 1.0f / (aspect_ratio * t);
+  projection_matrix(1, 1) = 1.0f / t;
+  projection_matrix(2, 2) = -(far / (far - near));
+  projection_matrix(2, 3) = -(far * near) / (far - near);
+  projection_matrix(3, 2) = -1.0f;
+
+  return projection_matrix;
+}
 
 vec::Vec3 Camera::get_position() const noexcept {
   float x{rho * std::sin(phi) * std::cos(theta)};
   float y{rho * std::sin(phi) * std::sin(theta)};
   float z{rho * std::cos(phi)};
-  return {target.x + x, target.y + y, target.z + z};
+  return {target.x() + x, target.y() + y, target.z() + z};
 }
