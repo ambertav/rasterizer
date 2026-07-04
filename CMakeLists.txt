@@ -34,10 +34,10 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
   ${CMAKE_SOURCE_DIR}/src/*.cpp
 )
 
-add_executable(app ${SOURCES})
-target_include_directories(app PRIVATE
+add_executable(renderer ${SOURCES})
+target_include_directories(renderer PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${sdl2_SOURCE_DIR}/include
 )
-target_link_libraries(app PRIVATE SDL2-static)
-set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+target_link_libraries(renderer PRIVATE SDL2-static)
+set_target_properties(renderer PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
