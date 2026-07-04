@@ -16,6 +16,8 @@ class Camera {
   Camera(Camera&&) = default;
   Camera& operator=(Camera&&) = default;
 
+  void orbit(float delta_rho, float delta_theta, float delta_phi) noexcept;
+
   vec::Mat4 get_view_matrix() const noexcept;
   vec::Mat4 get_projection_matrix(float aspect_ratio) const noexcept;
 

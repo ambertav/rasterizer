@@ -4,11 +4,16 @@
 #include <string>
 
 #include "colors.h"
-#include "frame_buffer.h"
+#include "primitives.h"
 #include "rasterizer.h"
+#include "scene.h"
 
 constexpr int DEFAULT_WIDTH{800};
 constexpr int DEFAULT_HEIGHT{600};
+
+constexpr float ORBIT_SENSITIVITY{0.01f};
+constexpr float ZOOM_SPEED{0.5f};
+constexpr float KEY_ORBIT_SPEED{0.1f};
 
 struct WindowConfiguration {
   int width{DEFAULT_WIDTH};
@@ -51,22 +56,70 @@ int main(int argc, char* argv[]) {
 
   Rasterizer rasterizer{static_cast<size_t>(config.width),
                         static_cast<size_t>(config.height)};
+  Scene scene{};
+  scene.meshes.push_back(primitives::make_sphere());
+
+  bool mouse_held{false};
 
   SDL_Event event;
   bool running{true};
 
   while (running) {
     while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_QUIT) {
-        std::cout << "quitting...\n";
-        running = false;
+      switch (event.type) {
+        case SDL_QUIT:
+          std::cout << "quitting...\n";
+          running = false;
+          break;
+
+        case SDL_MOUSEBUTTONDOWN:
+          if (event.button.button == SDL_BUTTON_LEFT) {
+            mouse_held = true;
+          }
+          break;
+
+        case SDL_MOUSEBUTTONUP:
+          if (event.button.button == SDL_BUTTON_LEFT) {
+            mouse_held = false;
+          }
+          break;
+
+        case SDL_MOUSEMOTION:
+          if (mouse_held) {
+            scene.camera.orbit(0.0f, event.motion.xrel * ORBIT_SENSITIVITY,
+                               event.motion.yrel * ORBIT_SENSITIVITY);
+          }
+          break;
+
+        case SDL_MOUSEWHEEL:
+          scene.camera.orbit(-event.wheel.y * ZOOM_SPEED, 0.0f, 0.0f);
+          break;
+
+        case SDL_KEYDOWN:
+          switch (event.key.keysym.sym) {
+            case SDLK_LEFT:
+              scene.camera.orbit(0.0f, -KEY_ORBIT_SPEED, 0.0f);
+              break;
+            case SDLK_RIGHT:
+              scene.camera.orbit(0.0f, KEY_ORBIT_SPEED, 0.0f);
+              break;
+            case SDLK_UP:
+              scene.camera.orbit(0.0f, 0.0f, -KEY_ORBIT_SPEED);
+              break;
+            case SDLK_DOWN:
+              scene.camera.orbit(0.0f, 0.0f, KEY_ORBIT_SPEED);
+              break;
+            case SDLK_ESCAPE:
+              std::cout << "quitting...\n";
+              running = false;
+              break;
+          }
       }
     }
 
-    rasterizer.clear();
-    rasterizer.draw_line({100, 100}, {400, 300}, colors::WHITE);
+    const FrameBuffer* fb{rasterizer.render(scene)};
 
-    SDL_UpdateTexture(texture, nullptr, rasterizer.get_frame_buffer()->data(),
+    SDL_UpdateTexture(texture, nullptr, fb->data(),
                       config.width * sizeof(uint32_t));
     SDL_RenderCopy(renderer, texture, nullptr, nullptr);
     SDL_RenderPresent(renderer);

@@ -1,10 +1,19 @@
 #include "camera.h"
 
+#include <algorithm>
 #include <cmath>
 
 Camera::Camera(vec::Vec3 t, float r, float th, float p, float fv, float n,
                float fr)
     : target(t), rho(r), theta(th), phi(p), fov(fv), near(n), far(fr) {}
+
+void Camera::orbit(float delta_rho, float delta_theta,
+                   float delta_phi) noexcept {
+  rho = std::max(0.1f, rho + delta_rho);  // non-negative
+  theta += delta_theta;
+  phi = std::clamp(phi + delta_phi, 0.01f,
+                   std::numbers::pi_v<float> - 0.01f);  // no flip
+}
 
 vec::Mat4 Camera::get_view_matrix() const noexcept {
   /*
