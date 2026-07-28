@@ -13,11 +13,14 @@ class FrameBuffer {
   FrameBuffer(FrameBuffer&&) = default;
   FrameBuffer& operator=(FrameBuffer&&) = default;
 
+  void set_pixel(size_t x, size_t y, uint32_t color);
   uint32_t get_pixel(size_t x, size_t y) const;
+
+  void set_depth(size_t x, size_t y, float z);
+  float get_depth(size_t x, size_t y) const;
+
   size_t get_width() const noexcept;
   size_t get_height() const noexcept;
-
-  void set_pixel(size_t x, size_t y, uint32_t color);
 
   void fill(uint32_t color) noexcept;
   void clear() noexcept;
@@ -28,6 +31,8 @@ class FrameBuffer {
   size_t index(size_t x, size_t y) const;
 
   std::vector<uint32_t> pixels;
+  std::vector<float> depth;
+  
   size_t width;
   size_t height;
 };
