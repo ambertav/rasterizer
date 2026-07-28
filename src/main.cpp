@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   Rasterizer rasterizer{static_cast<size_t>(config.width),
                         static_cast<size_t>(config.height)};
   Scene scene{};
-  scene.meshes.push_back(primitives::make_sphere());
+  scene.meshes.push_back(primitives::make_cube());
 
   bool mouse_held{false};
 

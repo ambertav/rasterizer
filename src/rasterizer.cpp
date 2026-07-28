@@ -5,6 +5,16 @@
 #include <iostream>
 #include <utility>
 
+namespace {
+constexpr float K_NEAR_EPSILON{1e-5f};
+float edge_function(const vec::Vec2& a, const vec::Vec2& b, float px,
+                    float py) {
+  return (px - a.x()) * static_cast<float>(b.y() - a.y()) -
+         (py - a.y()) * static_cast<float>(b.x() - a.x());
+}
+
+}  // namespace
+
 Rasterizer::Rasterizer(size_t w, size_t h) : fb(w, h) {}
 
 const FrameBuffer* Rasterizer::render(const Scene& scene) noexcept {
@@ -17,43 +27,102 @@ const FrameBuffer* Rasterizer::render(const Scene& scene) noexcept {
   vec::Mat4 projection{scene.camera.get_projection_matrix(aspect_ratio)};
   vec::Mat4 view_projection{projection * view};
 
+  // transform into clip space
+  auto to_clip = [&](const Vertex& vertex) -> ClipVertex {
+    return ClipVertex{
+        view_projection * vec::Vec4{vertex.position.x(), vertex.position.y(),
+                                    vertex.position.z(), 1.0f},
+        vertex.normal, vertex.uv};
+  };
+
   // viewport transform
-  auto to_screen = [&](const vec::Vec4& ndc) -> vec::Vec2 {
+  auto to_screen = [&](const ClipVertex& clip_vertex) -> RasterVertex {
+    vec::Vec4 ndc{clip_vertex.position / clip_vertex.position.w()};
+
     int x{static_cast<int>((ndc.x() + 1.0f) * 0.5f * fb.get_width())};
     int y{static_cast<int>((1.0f - ndc.y()) * 0.5f * fb.get_height())};
 
-    // clamp to framebuffer boundaries
-    x = std::clamp(x, 0, static_cast<int>(fb.get_width()) - 1);
-    y = std::clamp(y, 0, static_cast<int>(fb.get_height()) - 1);
+    // // clamp to framebuffer boundaries
+    // x = std::clamp(x, 0, static_cast<int>(fb.get_width()) - 1);
+    // y = std::clamp(y, 0, static_cast<int>(fb.get_height()) - 1);
 
-    return {x, y};
+    return RasterVertex{vec::Vec2{x, y}, clip_vertex.normal, clip_vertex.uv,
+                        ndc.z()};
   };
 
   for (const auto& mesh : scene.meshes) {
     for (const auto& triangle : mesh.triangles) {
-      const vec::Vec3& v0{mesh.vertices[triangle.i0].position};
-      const vec::Vec3& v1{mesh.vertices[triangle.i1].position};
-      const vec::Vec3& v2{mesh.vertices[triangle.i2].position};
+      std::array<ClipVertex, 3> clip_vertices{
+          to_clip(mesh.vertices[triangle.i0]),
+          to_clip(mesh.vertices[triangle.i1]),
+          to_clip(mesh.vertices[triangle.i2]),
+      };
 
-      // transform into clip space
-      vec::Vec4 c0{view_projection * vec::Vec4{v0.x(), v0.y(), v0.z(), 1.0f}};
-      vec::Vec4 c1{view_projection * vec::Vec4{v1.x(), v1.y(), v1.z(), 1.0f}};
-      vec::Vec4 c2{view_projection * vec::Vec4{v2.x(), v2.y(), v2.z(), 1.0f}};
-
-      if (c0.w() <= 0.0f || c1.w() <= 0.0f || c2.w() <= 0.0f) {
+      std::vector<ClipVertex> clipped{clip_near(clip_vertices)};
+      if (clipped.size() < 3) {
         continue;
       }
 
-      // NDC
-      vec::Vec4 ndc0{c0 / c0.w()};
-      vec::Vec4 ndc1{c1 / c1.w()};
-      vec::Vec4 ndc2{c2 / c2.w()};
+      for (size_t i{1}; i + 1 < clipped.size(); ++i) {
+        RasterVertex rv0{to_screen(clipped[0])};
+        RasterVertex rv1{to_screen(clipped[i])};
+        RasterVertex rv2{to_screen(clipped[i + 1])};
 
-      draw_triangle(to_screen(ndc0), to_screen(ndc1), to_screen(ndc2));
+        fill_triangle(rv0, rv1, rv2);
+      }
     }
   }
 
   return &fb;
+}
+
+void Rasterizer::fill(uint32_t color) noexcept { fb.fill(color); }
+
+void Rasterizer::clear() noexcept { fb.clear(); }
+
+Rasterizer::ClipVertex Rasterizer::lerp_clip_vertex(const ClipVertex& a,
+                                                    const ClipVertex& b,
+                                                    float t) {
+  ClipVertex cv{};
+  for (size_t i{}; i < 4; ++i) {
+    cv.position[i] = a.position[i] + (t * (b.position[i] - a.position[i]));
+  }
+
+  for (size_t i{}; i < 3; ++i) {
+    cv.normal[i] = a.normal[i] + (t * (b.normal[i] - a.normal[i]));
+  }
+
+  for (size_t i{}; i < 2; ++i) {
+    cv.uv[i] = a.uv[i] + (t * (b.uv[i] - a.uv[i]));
+  }
+
+  return cv;
+}
+
+std::vector<Rasterizer::ClipVertex> Rasterizer::clip_near(
+    const std::array<ClipVertex, 3>& clip_vertices) {
+  std::vector<ClipVertex> clipped{};
+  clipped.reserve(4);
+
+  for (size_t i{}; i < 3; ++i) {
+    const auto& current{clip_vertices[i]};
+    const auto& previous{clip_vertices[(i + 2) % 3]};
+
+    bool current_inside{current.position.w() > K_NEAR_EPSILON};
+    bool previous_inside{previous.position.w() > K_NEAR_EPSILON};
+
+    if (current_inside != previous_inside) {
+      float t{(K_NEAR_EPSILON - previous.position.w()) /
+              (current.position.w() - previous.position.w())};
+      clipped.push_back(lerp_clip_vertex(previous, current, t));
+    }
+
+    if (current_inside) {
+      clipped.push_back(current);
+    }
+  }
+
+  return clipped;
 }
 
 void Rasterizer::draw_line(vec::Vec2 p0, vec::Vec2 p1,
@@ -103,6 +172,59 @@ void Rasterizer::draw_triangle(vec::Vec2 p0, vec::Vec2 p1, vec::Vec2 p2,
   draw_line(p2, p0, color);
 }
 
-void Rasterizer::fill(uint32_t color) noexcept { fb.fill(color); }
+void Rasterizer::fill_triangle(const RasterVertex& v0, const RasterVertex& v1,
+                               const RasterVertex& v2,
+                               uint32_t color) noexcept {
+  // bounding box clamped to framebuffer
+  int minimum_x{std::max(
+      0, std::min({v0.position.x(), v1.position.x(), v2.position.x()}))};
+  int maximum_x{
+      std::min(static_cast<int>(fb.get_width()) - 1,
+               std::max({v0.position.x(), v1.position.x(), v2.position.x()}))};
+  int minimum_y{std::max(
+      0, std::min({v0.position.y(), v1.position.y(), v2.position.y()}))};
+  int maximum_y{
+      std::min(static_cast<int>(fb.get_height()) - 1,
+               std::max({v0.position.y(), v1.position.y(), v2.position.y()}))};
 
-void Rasterizer::clear() noexcept { fb.clear(); }
+  // area to normalize barycentric weight
+  float area{edge_function(v0.position, v1.position,
+                           static_cast<float>(v2.position.x()),
+                           static_cast<float>(v2.position.y()))};
+
+  if (area == 0.0f) {
+    return;
+  }
+
+  for (int y{minimum_y}; y <= maximum_y; ++y) {
+    for (int x{minimum_x}; x <= maximum_x; ++x) {
+      float px{x + 0.5f};
+      float py{y + 0.5f};
+
+      float w0{edge_function(v1.position, v2.position, px, py)};
+      float w1{edge_function(v2.position, v0.position, px, py)};
+      float w2{edge_function(v0.position, v1.position, px, py)};
+
+      bool inside{area > 0.0f ? (w0 >= 0 && w1 >= 0 && w2 >= 0)
+                              : (w0 <= 0 && w1 <= 0 && w2 <= 0)};
+      if (!inside) {
+        continue;
+      }
+
+      // normalize to barycentric coordinates
+      w0 /= area;
+      w1 /= area;
+      w2 /= area;
+
+      float z{(w0 * v0.depth) + (w1 * v1.depth) + (w2 * v2.depth)};
+
+      size_t sx{static_cast<size_t>(x)};
+      size_t sy{static_cast<size_t>(y)};
+
+      if (z < fb.get_depth(sx, sy)) {
+        fb.set_depth(sx, sy, z);
+        fb.set_pixel(sx, sy, color);
+      }
+    }
+  }
+}
