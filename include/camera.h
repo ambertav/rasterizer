@@ -32,4 +32,6 @@ class Camera {
   float fov;
   float near;
   float far;
+
+  vec::Vec3 up{0.0f, 0.0f, 1.0f};
 };

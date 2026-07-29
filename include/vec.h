@@ -228,5 +228,14 @@ inline Vec3 cross(const Vec3& lhs, const Vec3& rhs) noexcept {
 
   return {x, y, z};
 }
+inline Vec3 rotate(const Vec3& vector, const Vec3& axis, float theta) noexcept {
+  Vec3 normalized_axis{normalize(axis)};
+  float cos_theta{std::cos(theta)};
+  float sin_theta{std::sin(theta)};
+
+  return (vector * cos_theta) + (cross(normalized_axis, vector) * sin_theta) +
+         (normalized_axis *
+          (dot(normalized_axis, vector) * (1.0f - cos_theta)));
+}
 
 }  // namespace vec

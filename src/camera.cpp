@@ -9,10 +9,22 @@ Camera::Camera(vec::Vec3 t, float r, float th, float p, float fv, float n,
 
 void Camera::orbit(float delta_rho, float delta_theta,
                    float delta_phi) noexcept {
+  // camera orientation before updating in order to rotate `up`
+  vec::Vec3 forward_before{vec::normalize(get_position() - target)};
+  vec::Vec3 right{vec::normalize(vec::cross(up, forward_before))};
+
   rho = std::max(0.1f, rho + delta_rho);  // non-negative
   theta += delta_theta;
   phi = std::clamp(phi + delta_phi, 0.01f,
                    std::numbers::pi_v<float> - 0.01f);  // no flip
+
+  // rotate `up` by same angular motion
+  up = vec::rotate(up, vec::Vec3{0.0f, 0.0f, 1.0f}, delta_theta);  // horizontal
+  up = vec::rotate(up, right, delta_phi);                          // vertical
+
+  // re-normalize `up` for floating point drift
+  vec::Vec3 forward_after{vec::normalize(get_position() - target)};
+  up = vec::normalize(up - forward_after * vec::dot(up, forward_after));
 }
 
 vec::Mat4 Camera::get_view_matrix() const noexcept {
@@ -21,33 +33,25 @@ vec::Mat4 Camera::get_view_matrix() const noexcept {
   Z-up, right-handed convention
 
   forward -  direction from target to camera (position - target)
-  right - perpendicular to forward and world up (world_up x forward)
-  up - perpendicular to forward and right, reorthogonalized accounting for
+  right - perpendicular to forward and camera up (up x forward)
+  view_up - perpendicular to forward and right, reorthogonalized accounting for
   camera tilt (forward x right)
 
   final view matrix is:
-    [ right.x   right.y   right.z   -dot(right,   position) ]
-    [ up.x      up.y      up.z      -dot(up,       position) ]
-    [ forward.x forward.y forward.z -dot(forward,  position) ]
-    [ 0         0         0          1                       ]
+    [ right.x       right.y        right.z        -dot(right,   position)  ]
+    [ view_up.x     view_up.y      view_up.z      -dot(view_up, position)  ]
+    [ forward.x     forward.y      forward.z      -dot(forward,  position) ]
+    [ 0             0              0               1                       ]
   */
 
   vec::Vec3 position{get_position()};
-  vec::Vec3 world_up{0.0f, 0.0f, 1.0f};
-
   vec::Vec3 forward{vec::normalize(position - target)};
-
-  // fallback when camera at pole (forward nearly paralell to Z-up)
-  if (std::abs(forward.z()) > 0.999f) {
-    world_up = {1.0f, 0.0f, 0.0f};
-  }
-
-  vec::Vec3 right{vec::normalize(vec::cross(world_up, forward))};
-  vec::Vec3 up{vec::normalize(vec::cross(forward, right))};
+  vec::Vec3 right{vec::normalize(vec::cross(up, forward))};
+  vec::Vec3 view_up{vec::normalize(vec::cross(forward, right))};
 
   vec::Vec4 axes[4]{
       {right.x(), right.y(), right.z(), -vec::dot(right, position)},
-      {up.x(), up.y(), up.z(), -vec::dot(up, position)},
+      {view_up.x(), view_up.y(), view_up.z(), -vec::dot(view_up, position)},
       {forward.x(), forward.y(), forward.z(), -vec::dot(forward, position)},
       {0.0f, 0.0f, 0.0f, 1.0f}};
 
