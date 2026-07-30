@@ -7,10 +7,17 @@
 
 namespace {
 constexpr float K_NEAR_EPSILON{1e-5f};
+constexpr float AMBIENT_LIGHT{0.10f};
 float edge_function(const vec::Vec2& a, const vec::Vec2& b, float px,
                     float py) {
   return (px - a.x()) * static_cast<float>(b.y() - a.y()) -
          (py - a.y()) * static_cast<float>(b.x() - a.x());
+}
+
+float compute_light_intensity(const vec::Vec3& normal,
+                              const vec::Vec3& direction) {
+  float diffuse{std::max(0.0f, vec::dot(normal, direction * -1.0f))};
+  return AMBIENT_LIGHT + diffuse * (1.0f - AMBIENT_LIGHT);
 }
 
 }  // namespace
@@ -42,10 +49,6 @@ const FrameBuffer* Rasterizer::render(const Scene& scene) noexcept {
     int x{static_cast<int>((ndc.x() + 1.0f) * 0.5f * fb.get_width())};
     int y{static_cast<int>((1.0f - ndc.y()) * 0.5f * fb.get_height())};
 
-    // // clamp to framebuffer boundaries
-    // x = std::clamp(x, 0, static_cast<int>(fb.get_width()) - 1);
-    // y = std::clamp(y, 0, static_cast<int>(fb.get_height()) - 1);
-
     return RasterVertex{vec::Vec2{x, y}, clip_vertex.normal, clip_vertex.uv,
                         ndc.z()};
   };
@@ -63,12 +66,16 @@ const FrameBuffer* Rasterizer::render(const Scene& scene) noexcept {
         continue;
       }
 
+      float intensity{compute_light_intensity(mesh.vertices[triangle.i0].normal,
+                                              scene.light.get_direction())};
+      uint32_t color{colors::scale_color(colors::WHITE, intensity)};
+
       for (size_t i{1}; i + 1 < clipped.size(); ++i) {
         RasterVertex rv0{to_screen(clipped[0])};
         RasterVertex rv1{to_screen(clipped[i])};
         RasterVertex rv2{to_screen(clipped[i + 1])};
 
-        fill_triangle(rv0, rv1, rv2);
+        fill_triangle(rv0, rv1, rv2, color);
       }
     }
   }

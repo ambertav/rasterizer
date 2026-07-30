@@ -18,10 +18,11 @@ class Camera {
 
   void orbit(float delta_rho, float delta_theta, float delta_phi) noexcept;
 
-  vec::Mat4 get_view_matrix() const noexcept;
-  vec::Mat4 get_projection_matrix(float aspect_ratio) const noexcept;
+  [[nodiscard]] vec::Mat4 get_view_matrix() const noexcept;
+  [[nodiscard]] vec::Mat4 get_projection_matrix(
+      float aspect_ratio) const noexcept;
 
-  vec::Vec3 get_position() const noexcept;
+  [[nodiscard]] vec::Vec3 get_position() const noexcept;
 
  private:
   // spherical coordinates
